@@ -18,10 +18,7 @@ MANIFEST
 *.spec
 pip-log.txt
 pip-delete-this-directory.txt
-.coverage
-.coverage.*
 .cache
-*.cover
 *.py.cover
 .pytest_cache/
 cover/
