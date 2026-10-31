@@ -1,0 +1,4 @@
+dotenv
+pandas
+psycopg[binary]
+ollama
