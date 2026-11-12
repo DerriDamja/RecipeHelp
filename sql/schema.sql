@@ -1,3 +1,6 @@
+-- Preference Type --
+CREATE TYPE preference_enum AS ENUM ('LOVE', 'LIKE', 'EXCLUDE');
+
 -- Users --
 CREATE TABLE IF NOT EXISTS users (
     user_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -8,52 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
 
 
 
--- User Preferences --
-CREATE TABLE IF NOT EXISTS user_diets (
-    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    diet_id BIGINT NOT NULL REFERENCES diets(diet_id) ON DELETE RESTRICT,
-    PRIMARY KEY (user_id, diet_id)
-);
-
-CREATE TABLE IF NOT EXISTS user_health_labels (
-    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    health_label_id BIGINT NOT NULL REFERENCES health_labels(health_label_id) ON DELETE RESTRICT,
-    PRIMARY KEY (user_id, health_label_id)
-);
-
-CREATE TABLE IF NOT EXISTS user_cuisine_preferences (
-    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    cuisine_id BIGINT NOT NULL REFERENCES cuisines(cuisine_id) ON DELETE RESTRICT,
-    preference TEXT NOT NULL CHECK (preference IN (
-        'LOVE',
-        'LIKE',
-        'EXCLUDE'
-    )),
-    PRIMARY KEY (user_id, cuisine_id)
-);
-
-CREATE TABLE IF NOT EXISTS user_ingredient_preferences (
-    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    ingredient_id BIGINT NOT NULL REFERENCES ingredients(ingredient_id) ON DELETE RESTRICT,
-    preference TEXT NOT NULL CHECK (preference IN (
-        'LOVE',
-        'LIKE',
-        'EXCLUDE'
-    )),
-    PRIMARY KEY (user_id, ingredient_id)
-);
-
-CREATE TABLE IF NOT EXISTS user_nutrition_goals (
-    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    ingredient_id BIGINT NOT NULL REFERENCES nutrients(nutrient_id) ON DELETE RESTRICT,
-    min_quantity NUMERIC(12,4) CHECK (min_quantity IS NULL OR min_quantity >= 0),
-    max_quantity NUMERIC(12,4) CHECK (max_quantity IS NULL OR max_quantity >= 0),
-    CONSTRAINT chk_nutrition_goal_range CHECK(
-        min_quantity IS NULL
-        OR max_quantity IS NULL
-        OR min_quantity <= max_quantity
-    ),
-    PRIMARY KEY (user_id, ingredient_id)
+-- Recipe Sources --
+CREATE TABLE IF NOT EXISTS recipe_sources (
+    source_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    source_name TEXT NOT NULL,
+    source_url TEXT UNIQUE
 );
 
 
@@ -69,36 +31,12 @@ CREATE TABLE IF NOT EXISTS recipes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Recipe Junction Tables --
-CREATE TABLE IF NOT EXISTS recipe_sources (
-    source_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    source_name TEXT NOT NULL,
-    source_url TEXT UNIQUE NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS recipe_ingredients (
-    recipe_id BIGINT NOT NULL REFERENCES recipes(recipe_id) ON DELETE CASCADE,
-    ingredient_id BIGINT NOT NULL REFERENCES ingredients(ingredient_id) ON DELETE RESTRICT,
-    original_text TEXT NOT NULL,
-    measure TEXT,
-    quantity NUMERIC CHECK (quantity IS NULL OR quantity > 0),
-    weight_g NUMERIC CHECK (weight_g IS NULL OR weight_g > 0),
-    PRIMARY KEY (recipe_id, ingredient_id)
-);
-
-CREATE TABLE IF NOT EXISTS recipe_nutrients (
-    recipe_id BIGINT NOT NULL REFERENCES recipes(recipe_id) ON DELETE CASCADE,
-    nutrient_id BIGINT NOT NULL REFERENCES nutrients(nutrient_id) ON DELETE RESTRICT,
-    quantity NUMERIC(12, 4) NOT NULL CHECK (quantity >= 0),
-    PRIMARY KEY (recipe_id, nutrient_id)
-);
-
 
 
 -- Ingredients --
 CREATE TABLE IF NOT EXISTS ingredients (
     ingredient_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    ingredient_name TEXT NOT NULL,
+    ingredient_name UNIQUE TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -143,6 +81,68 @@ CREATE TABLE IF NOT EXISTS meal_types (
 CREATE TABLE IF NOT EXISTS dish_types (
     dish_type_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     dish_type_name TEXT NOT NULL UNIQUE
+);
+
+
+
+-- User Preferences --
+CREATE TABLE IF NOT EXISTS user_diets (
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    diet_id BIGINT NOT NULL REFERENCES diets(diet_id) ON DELETE RESTRICT,
+    PRIMARY KEY (user_id, diet_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_health_labels (
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    health_label_id BIGINT NOT NULL REFERENCES health_labels(health_label_id) ON DELETE RESTRICT,
+    PRIMARY KEY (user_id, health_label_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_cuisine_preferences (
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    cuisine_id BIGINT NOT NULL REFERENCES cuisines(cuisine_id) ON DELETE RESTRICT,
+    preference preference_enum NOT NULL,
+    PRIMARY KEY (user_id, cuisine_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_ingredient_preferences (
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    ingredient_id BIGINT NOT NULL REFERENCES ingredients(ingredient_id) ON DELETE RESTRICT,
+    preference preference_enum NOT NULL,
+    PRIMARY KEY (user_id, ingredient_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_nutrition_goals (
+    user_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    nutrient_id BIGINT NOT NULL REFERENCES nutrients(nutrient_id) ON DELETE RESTRICT,
+    min_quantity NUMERIC(12,4) CHECK (min_quantity IS NULL OR min_quantity >= 0),
+    max_quantity NUMERIC(12,4) CHECK (max_quantity IS NULL OR max_quantity >= 0),
+    CONSTRAINT chk_nutrition_goal_range CHECK(
+        min_quantity IS NULL
+        OR max_quantity IS NULL
+        OR min_quantity <= max_quantity
+    ),
+    PRIMARY KEY (user_id, nutrient_id)
+);
+
+
+
+-- Recipe Junction Tables --
+CREATE TABLE IF NOT EXISTS recipe_ingredients (
+    recipe_id BIGINT NOT NULL REFERENCES recipes(recipe_id) ON DELETE CASCADE,
+    ingredient_id BIGINT NOT NULL REFERENCES ingredients(ingredient_id) ON DELETE RESTRICT,
+    original_text TEXT NOT NULL,
+    measure TEXT,
+    quantity NUMERIC CHECK (quantity IS NULL OR quantity > 0),
+    weight_g NUMERIC CHECK (weight_g IS NULL OR weight_g > 0),
+    PRIMARY KEY (recipe_id, ingredient_id)
+);
+
+CREATE TABLE IF NOT EXISTS recipe_nutrients (
+    recipe_id BIGINT NOT NULL REFERENCES recipes(recipe_id) ON DELETE CASCADE,
+    nutrient_id BIGINT NOT NULL REFERENCES nutrients(nutrient_id) ON DELETE RESTRICT,
+    quantity NUMERIC(12, 4) CHECK (quantity IS NULL OR quantity >= 0),
+    PRIMARY KEY (recipe_id, nutrient_id)
 );
 
 
