@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS recipes (
 -- Ingredients --
 CREATE TABLE IF NOT EXISTS ingredients (
     ingredient_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    ingredient_name UNIQUE TEXT NOT NULL,
+    ingredient_name TEXT UNIQUE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
