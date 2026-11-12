@@ -3,13 +3,15 @@ First-time setup script for initialization
 
 This involves:
 - Initializing and populating the database
+- Adding database indexes
 """
-import os
-import recipehelp.db
+from recipehelp import db
+from recipehelp import ingest
 
 
 def main() -> None:
-    raise NotImplementedError
+    db.execute_sql_script("schema.sql")
+    print("[SETUP] Successfully initialized DB tables.")
 
 
 if __name__ == "__main__":
