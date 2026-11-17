@@ -4,3 +4,4 @@ psycopg[binary,pool]==3.3.6
 ollama==0.6.3
 fsspec==2026.9.0
 huggingface-hub==2.4.0
+typer==0.29.1
