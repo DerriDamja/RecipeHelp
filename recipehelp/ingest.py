@@ -14,7 +14,7 @@ JSON_COLS = [
     "meal_type",
     "dish_type",
     "ingredients",
-    "total_nutritients",
+    "total_nutrients",
     ]
 
 @dataclass
@@ -63,14 +63,13 @@ def _make_recipe_junction(df: pd.DataFrame, col: str, key_col: str) -> pd.DataFr
                 records.append({
                     "recipe_name": recipe_name,
                     "source": source,
-                    key_col: item
+                    key_col: item,
                 })
     return pd.DataFrame(records)
 
 
-def transform_dataset() -> IngestionBundle:
+def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
     """Processes the recipe dataset to ensure existence of necessary information."""
-    df: pd.DataFrame = fetch_dataset()
 
     for col in JSON_COLS:
         df[col] = df[col].apply(_json_parse)
@@ -88,7 +87,7 @@ def transform_dataset() -> IngestionBundle:
     recipe_df["total_weight_g"] = pd.to_numeric(recipe_df["total_weight_g"], errors="coerce")
     bundle.tables["recipes"] = recipe_df
 
-    # Recipe Properties
+    # Properties
     bundle.tables["diets"] = pd.DataFrame(_flatten_json_list(df, "diet_labels"), columns=["diet_name"]).drop_duplicates()
     bundle.tables["health_labels"] = pd.DataFrame(_flatten_json_list(df, "health_labels"), columns=["health_label_name"]).drop_duplicates()
     bundle.tables["cautions"] = pd.DataFrame(_flatten_json_list(df, "cautions"), columns=["caution_name"]).drop_duplicates()
@@ -107,7 +106,7 @@ def transform_dataset() -> IngestionBundle:
                     "source": source,
                     "ingredient_name": ing.get("food", ""),
                     "original_text": ing.get("text", ""),
-                    "measure": ing.get("measure"),
+                    "measure": ing.get("measure") if ing.get("measure") != "<unit>" else None,
                     "quantity": float(ing["quantity"]) if "quantity" in ing else None,
                     "weight_g": float(ing["weight"]) if "weight" in ing else None,
                 })
@@ -132,6 +131,7 @@ def transform_dataset() -> IngestionBundle:
     bundle.tables["recipe_nutrients"] = pd.DataFrame(nutrient_records)
     bundle.tables["nutrients"] = bundle.tables["recipe_nutrients"][["nutrient_tag", "nutrient_name", "unit"]].drop_duplicates()
 
+    # Recipe Properties
     bundle.tables["recipe_diets"] = _make_recipe_junction(df, "diet_labels", "diet_name")
     bundle.tables["recipe_health_labels"] = _make_recipe_junction(df, "health_labels", "health_label_name")
     bundle.tables["recipe_cautions"] = _make_recipe_junction(df, "cautions", "caution_name")
@@ -146,3 +146,10 @@ def frame_to_rows(df: pd.DataFrame):
     """Converts DataFrames to a list of tuples, replacing any NaN with None for psycopg compat"""
     cleaned = df.where(pd.notnull(df), None).astype(object)
     return [tuple(x) for x in cleaned.to_numpy()]
+
+
+if __name__ == "__main__":
+    df = fetch_dataset()
+    bundle = transform_dataset(df)
+    for table, frame in bundle.tables.items():
+        print(f"{table}: {frame.head(10)}")
