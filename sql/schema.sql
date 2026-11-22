@@ -117,6 +117,10 @@ CREATE TABLE IF NOT EXISTS user_nutrition_goals (
         OR max_quantity IS NULL
         OR min_quantity <= max_quantity
     ),
+    CONSTRAINT chk_bounded_goal CHECK(
+        min_quantity IS NOT NULL
+        OR max_quantity IS NOT NULL
+    ),
     PRIMARY KEY (user_id, nutrient_id)
 );
 
