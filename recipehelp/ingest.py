@@ -89,6 +89,7 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
 
     # Recipes
     recipe_df = df[[
+        "temp_recipe_id",
         "recipe_name",
         "source",
         "url",
