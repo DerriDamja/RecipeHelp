@@ -53,17 +53,27 @@ def _flatten_json_list(df: pd.DataFrame, col: str, item_key: str = "") -> list[s
     return items
 
 
-"""def _make_recipe_junction(df: pd.DataFrame, col: str, key_col: str) -> pd.DataFrame:
+def _make_recipe_junction(df: pd.DataFrame, col: str, key_col: str) -> pd.DataFrame:
+    """
+    Creates a basic recipe junction DataFrame.
+    Appropriate when no additional attributes are stored.
+    """
+    if not col in df.columns:
+        raise KeyError(f"Column {col} does not exist in the DataFrame")
+    
     records = []
-    for _, row in df.itertuples():
-        recipe_name = row["recipe_name"]
-        for item in row.get(col, []):
-            if isinstance(item, str):
-                records.append({
-                    "recipe_name": recipe_name,
-                    key_col: item,
-                })
-    return pd.DataFrame(records)"""
+    for row in df.itertuples():
+        temp_id = row.temp_recipe_id
+
+        for item in getattr(row, col):
+            if not isinstance(item, str):
+                continue
+
+            records.append({
+                "temp_recipe_id": temp_id,
+                key_col: item,
+            })
+    return pd.DataFrame(records)
 
 
 def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
@@ -110,11 +120,11 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
     # Ingredients (and Recipe-Ingredient Junction)
     recipe_ing_records = {}
     for row in df.itertuples():
-        temp_id = row.temp_recipe_id
-        ingredients = row.ingredients
+        ingredients = getattr(row, "ingredients", [])
         if not isinstance(ingredients, list):
             continue
 
+        temp_id = row.temp_recipe_id
         for ing in ingredients:
             if not isinstance(ing, dict) or not {"food", "text", "weight"}.issubset(ing.keys()):
                 continue
@@ -149,18 +159,19 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
     # Nutrients (and Recipe-Nutrients Junction)
     recipe_nutrient_records = []
     for row in df.itertuples():
-        if not isinstance(row.total_nutrients, dict):
+        nutrients = getattr(row, "total_nutrients", {})
+        if not isinstance(nutrients, dict):
             continue
 
         temp_id = row.temp_recipe_id
-        for tag, data in row.total_nutrients.items():
+        for tag, data in nutrients.items():
             if not isinstance(data, dict):
                 continue
 
             quantity = float(data.get("quantity", 0))
             recipe_nutrient_records.append({
                 "temp_recipe_id": temp_id,
-                "nutrient_tag": tag,
+                "nutrient_tag": tag.upper(),
                 "nutrient_name": data.get("label", ""),
                 "unit": data.get("unit", ""),
                 "quantity": quantity if quantity > 0 else None
@@ -168,13 +179,13 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
     bundle.tables["recipe_nutrients"] = pd.DataFrame(recipe_nutrient_records)
     bundle.tables["nutrients"] = bundle.tables["recipe_nutrients"][["nutrient_tag", "nutrient_name", "unit"]].drop_duplicates()
 
-    """# Recipe Properties
+    # Recipe Properties
     bundle.tables["recipe_diets"] = _make_recipe_junction(df, "diet_labels", "diet_name")
     bundle.tables["recipe_health_labels"] = _make_recipe_junction(df, "health_labels", "health_label_name")
     bundle.tables["recipe_cautions"] = _make_recipe_junction(df, "cautions", "caution_name")
     bundle.tables["recipe_cuisines"] = _make_recipe_junction(df, "cuisine_type", "cuisine_name")
     bundle.tables["recipe_meal_types"] = _make_recipe_junction(df, "meal_type", "meal_type_name")
-    bundle.tables["recipe_dish_types"] = _make_recipe_junction(df, "dish_type", "dish_type_name")"""
+    bundle.tables["recipe_dish_types"] = _make_recipe_junction(df, "dish_type", "dish_type_name")
 
     return bundle
 
