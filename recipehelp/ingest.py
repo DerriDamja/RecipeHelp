@@ -155,7 +155,7 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
                 recipe_ing_records[ing_key]["quantity"] = None
 
     bundle.tables["recipe_ingredients"] = pd.DataFrame(recipe_ing_records.values())
-    bundle.tables["ingredients"] = bundle.tables["recipe_ingredients"]["ingredient_name"].drop_duplicates().to_frame()
+    bundle.tables["ingredients"] = bundle.tables["recipe_ingredients"][["ingredient_name"]].drop_duplicates()
 
     # Nutrients (and Recipe-Nutrients Junction)
     recipe_nutrient_records = []
@@ -172,8 +172,8 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
             quantity = float(data.get("quantity", 0))
             recipe_nutrient_records.append({
                 "temp_recipe_id": temp_id,
-                "nutrient_tag": tag.upper(),
                 "nutrient_name": data.get("label", ""),
+                "nutrient_tag": tag.upper(),
                 "unit": data.get("unit", ""),
                 "quantity": quantity if quantity > 0 else None
             })
