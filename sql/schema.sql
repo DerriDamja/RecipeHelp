@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS recipe_ingredients (
     original_text TEXT NOT NULL,
     measure TEXT,
     quantity NUMERIC CHECK (quantity IS NULL OR quantity > 0),
-    weight_g NUMERIC NOT NULL CHECK (weight_g > 0),
+    weight_g NUMERIC NOT NULL CHECK (weight_g >= 0),
     PRIMARY KEY (recipe_id, ingredient_id)
 );
 
