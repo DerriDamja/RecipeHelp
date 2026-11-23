@@ -205,17 +205,3 @@ def frame_to_rows(df: pd.DataFrame):
             else:
                 cleaned_row.append(val)
         yield cleaned_row
-
-
-if __name__ == "__main__":
-    print("Fetching...")
-    df = fetch_dataset()
-    print("Fetched")
-    bundle = transform_dataset(df)
-    print("transformed")
-    pd.set_option("display.max_columns", None)
-    for table, frame in bundle.tables.items():
-        rows = frame_to_rows(frame)
-        print(f"{table}: {frame.head(50)}")
-        for i in range(50):
-            print(f"{table}: {next(rows)}")
