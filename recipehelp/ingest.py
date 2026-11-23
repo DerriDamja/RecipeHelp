@@ -2,8 +2,8 @@
 
 import json
 import pandas as pd
-import numpy as np
 from dataclasses import dataclass, field
+from math import isnan
 
 DATASET_URL = r"hf://datasets/datahiveai/recipes-with-nutrition/recipes-with-nutrition.csv"
 JSON_COLS = [
@@ -111,12 +111,12 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
     ])
 
     # Properties
-    bundle.tables["diets"] = pd.DataFrame(_flatten_json_list(df, "diet_labels"), columns=["diet_name"]).drop_duplicates().reset_index(drop=True)
-    bundle.tables["health_labels"] = pd.DataFrame(_flatten_json_list(df, "health_labels"), columns=["health_label_name"]).drop_duplicates().reset_index(drop=True)
-    bundle.tables["cautions"] = pd.DataFrame(_flatten_json_list(df, "cautions"), columns=["caution_name"]).drop_duplicates().reset_index(drop=True)
-    bundle.tables["cuisines"] = pd.DataFrame(_flatten_json_list(df, "cuisine_type"), columns=["cuisine_name"]).drop_duplicates().reset_index(drop=True)
-    bundle.tables["meal_types"] = pd.DataFrame(_flatten_json_list(df, "meal_type"), columns=["meal_type_name"]).drop_duplicates().reset_index(drop=True)
-    bundle.tables["dish_types"] = pd.DataFrame(_flatten_json_list(df, "dish_type"), columns=["dish_type_name"]).drop_duplicates().reset_index(drop=True)
+    bundle.tables["diets"] = pd.DataFrame(_flatten_json_list(df, "diet_labels"), columns=["diet_name"]).drop_duplicates()
+    bundle.tables["health_labels"] = pd.DataFrame(_flatten_json_list(df, "health_labels"), columns=["health_label_name"]).drop_duplicates()
+    bundle.tables["cautions"] = pd.DataFrame(_flatten_json_list(df, "cautions"), columns=["caution_name"]).drop_duplicates()
+    bundle.tables["cuisines"] = pd.DataFrame(_flatten_json_list(df, "cuisine_type"), columns=["cuisine_name"]).drop_duplicates()
+    bundle.tables["meal_types"] = pd.DataFrame(_flatten_json_list(df, "meal_type"), columns=["meal_type_name"]).drop_duplicates()
+    bundle.tables["dish_types"] = pd.DataFrame(_flatten_json_list(df, "dish_type"), columns=["dish_type_name"]).drop_duplicates()
 
     # Ingredients (and Recipe-Ingredient Junction)
     recipe_ing_records = {}
@@ -139,12 +139,16 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
             ing_key = (temp_id, ing_name)
 
             if ing_key not in recipe_ing_records:
+                measure = ing.get("measure")
+                measure = None if measure == "<unit>" else measure
+                quantity = float(ing.get("quantity", 0))
+
                 recipe_ing_records[ing_key] = {
                     "temp_recipe_id": temp_id,
                     "ingredient_name": ing["food"].lower(),
                     "original_text": ing["text"],
-                    "measure": ing.get("measure") if ing.get("measure") != "<unit>" else None,
-                    "quantity": float(ing["quantity"]) if "quantity" in ing else None,
+                    "measure": measure,
+                    "quantity": quantity if quantity > 0 else None,
                     "weight_g": float(ing["weight"]),
                 }
             else:
@@ -166,15 +170,15 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
 
         temp_id = row.temp_recipe_id
         for tag, data in nutrients.items():
-            if not isinstance(data, dict):
+            if not isinstance(data, dict) or not {"label", "unit"}.issubset(data.keys()):
                 continue
 
             quantity = float(data.get("quantity", 0))
             recipe_nutrient_records.append({
                 "temp_recipe_id": temp_id,
-                "nutrient_name": data.get("label", ""),
+                "nutrient_name": data["label"],
                 "nutrient_tag": tag.upper(),
-                "unit": data.get("unit", ""),
+                "unit": data["unit"],
                 "quantity": quantity if quantity > 0 else None
             })
     bundle.tables["recipe_nutrients"] = pd.DataFrame(recipe_nutrient_records)
@@ -191,8 +195,27 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
     return bundle
 
 
+def frame_to_rows(df: pd.DataFrame):
+    for row in df.itertuples(index=False, name=None):
+        cleaned_row = []
+        for val in row:
+            # Converts NaN values to None so psycopg inserts NULL rather than NaN
+            if isinstance(val, float) and isnan(val):
+                cleaned_row.append(None)
+            else:
+                cleaned_row.append(val)
+        yield cleaned_row
+
+
 if __name__ == "__main__":
+    print("Fetching...")
     df = fetch_dataset()
+    print("Fetched")
     bundle = transform_dataset(df)
+    print("transformed")
+    pd.set_option("display.max_columns", None)
     for table, frame in bundle.tables.items():
-        print(f"{table}: {frame.head(20)}")
+        rows = frame_to_rows(frame)
+        print(f"{table}: {frame.head(50)}")
+        for i in range(50):
+            print(f"{table}: {next(rows)}")
