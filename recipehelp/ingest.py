@@ -3,7 +3,6 @@
 import json
 import pandas as pd
 from dataclasses import dataclass, field
-from math import isnan
 
 DATASET_URL = r"hf://datasets/datahiveai/recipes-with-nutrition/recipes-with-nutrition.csv"
 JSON_COLS = [
@@ -193,15 +192,3 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
     bundle.tables["recipe_dish_types"] = _make_recipe_junction(df, "dish_type", "dish_type_name")
 
     return bundle
-
-
-def frame_to_rows(df: pd.DataFrame):
-    for row in df.itertuples(index=False, name=None):
-        cleaned_row = []
-        for val in row:
-            # Converts NaN values to None so psycopg inserts NULL rather than NaN
-            if isinstance(val, float) and isnan(val):
-                cleaned_row.append(None)
-            else:
-                cleaned_row.append(val)
-        yield cleaned_row
