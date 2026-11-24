@@ -3,6 +3,7 @@
 import pandas as pd
 import psycopg
 import os
+from psycopg.sql import SQL, Identifier
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import LiteralString, cast
@@ -39,7 +40,9 @@ def get_db_vars() -> dict:
 def get_connection(retries: int = 10, delay: float = 5.0, **kwargs) -> psycopg.Connection:
     for attempt in range (1, retries + 1):
         try:
-            return psycopg.connect(**kwargs)
+            if kwargs:
+                return psycopg.connect(**kwargs)
+            return psycopg.connect(**get_db_vars())
 
         except psycopg.Error:
             if attempt >= retries:
@@ -53,7 +56,7 @@ def get_connection(retries: int = 10, delay: float = 5.0, **kwargs) -> psycopg.C
 
 def execute_sql_script(filename: str) -> None:
     """Executes a SQL script located under {PROJECT}/sql/ given a file name"""
-    with get_connection(**get_db_vars()) as conn:
+    with get_connection() as conn:
         sql_file = SQL_PATH / filename
 
         if not sql_file.exists():
@@ -65,71 +68,305 @@ def execute_sql_script(filename: str) -> None:
         conn.execute(query=sql)
 
 
-def insert_recipes(recipe_df: pd.DataFrame) -> dict:
-    """Inserts recipes from a DataFrame. Returns the recipe ID mapping."""
-    recipe_id_mapping = {}
-
-    with get_connection(**get_db_vars()) as conn:
-        try:
-            with conn.cursor() as cur:
-                for row in recipe_df.itertuples():
-                    cur.execute(
-                        """
-                        INSERT INTO recipes (
-                            recipe_name,
-                            source_name,
-                            source_url,
-                            image_url,
-                            servings,
-                            calories,
-                            total_weight_g
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (source_url) DO NOTHING
-                        RETURNING recipe_id;
-                        """, (
-                        getattr(row, "recipe_name"),
-                        getattr(row, "source_name"),
-                        getattr(row, "source_url"),
-                        getattr(row, "image_url"),
-                        getattr(row, "servings"),
-                        getattr(row, "calories"),
-                        getattr(row, "total_weight_g"),
-                    ))
-
-                    res = cur.fetchone()
-                    if not res:
-                        raise RuntimeError(f"INSERT of recipe {getattr(row, "temp_recipe_id")} did not return a recipe_id")
-
-                    recipe_id = res[0]
-                    recipe_id_mapping[getattr(row, "temp_recipe_id")] = recipe_id
-        except Exception as e:
-            conn.rollback()
-            print(f"[ERROR] {e}")
-            raise
-
-    return recipe_id_mapping
+def _prepare_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Prepares DataFrames for DB insertion by replacing NaNs with None (NULL)"""
+    return df.astype(object).where(pd.notna(df), None)
 
 
-def _extract_bundle_df(bundle: IngestionBundle, frame_name: str) -> pd.DataFrame:
-    if frame_name not in bundle.tables:
-        raise KeyError(f"Frame {frame_name} does not exist")
+def insert_recipes(df: pd.DataFrame) -> dict[int, int]:
+    """Inserts recipes from a DataFrame. Returns the recipe ID map."""
+    recipe_map = {}
+    df = _prepare_df(df)
 
-    return bundle.tables.get(frame_name, pd.DataFrame())
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for row in df.itertuples():
+                cur.execute(
+                    """
+                    INSERT INTO recipes (
+                        recipe_name,
+                        source_name,
+                        source_url,
+                        image_url,
+                        servings,
+                        calories,
+                        total_weight_g
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                    RETURNING recipe_id;
+                    """, (
+                    getattr(row, "recipe_name"),
+                    getattr(row, "source_name"),
+                    getattr(row, "source_url"),
+                    getattr(row, "image_url"),
+                    getattr(row, "servings"),
+                    getattr(row, "calories"),
+                    getattr(row, "total_weight_g"),
+                ))
+
+                res = cur.fetchone()
+                if not res:
+                    raise RuntimeError(f"INSERT of recipe {getattr(row, "temp_recipe_id")} did not return a recipe_id")
+
+                recipe_id = res[0]
+                recipe_map[getattr(row, "temp_recipe_id")] = recipe_id
+
+    return recipe_map
+
+
+def insert_nutrients(df: pd.DataFrame) -> dict[str, int]:
+    nutrient_map = {}
+    df = _prepare_df(df)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for row in df.itertuples():
+                cur.execute(
+                    """
+                    INSERT INTO nutrients (
+                        nutrient_name,
+                        nutrient_tag,
+                        unit
+                    )
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                    RETURNING nutrient_id;
+                    """, (
+                    getattr(row, "nutrient_name"),
+                    getattr(row, "nutrient_tag"),
+                    getattr(row, "unit"),
+                ))
+
+                res = cur.fetchone()
+                if not res:
+                    raise RuntimeError(f"INSERT of nutrient {getattr(row, "nutrient_tag")} did not return a nutrient_id")
+
+                nutrient_id = res[0]
+                nutrient_map[getattr(row, "nutrient_tag")] = nutrient_id
+
+    return nutrient_map
+
+
+def insert_one_val_table(
+        df: pd.DataFrame,
+        table: str,
+        id_col: str,
+        val_name: str,
+        ) -> dict[str, int]:
+    """
+    Inserts a simple table containing only one UNIQUE attribute.
+    The DataFrame's val_name must match the DB's attribute name.
+    Returns an ID map.
+    """
+    id_map = {}
+    df = _prepare_df(df)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            query = SQL(
+                """
+                INSERT INTO {} ({})
+                VALUES (%s)
+                ON CONFLICT DO NOTHING
+                RETURNING {};
+                """).format(
+                Identifier(table),
+                Identifier(val_name),
+                Identifier(id_col),
+            )
+
+            for row in df.itertuples():
+                cur.execute(query, (getattr(row, val_name),))
+
+                res = cur.fetchone()
+                if not res:
+                    raise RuntimeError(f"INSERT of {val_name} did not return a {id_col}")
+
+                id = res[0]
+                id_map[getattr(row, val_name)] = id
+
+    return id_map
+
+
+def insert_recipe_junction(
+        df: pd.DataFrame,
+        table: str,
+        other_id_col: str,
+        other_col: str,
+        recipe_map: dict,
+        other_map: dict,
+        ) -> None:
+    """Inserts basic recipe junctions."""
+    df = _prepare_df(df)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            query = SQL(
+                """
+                INSERT INTO {} (recipe_id, {})
+                VALUES (%s, %s)
+                ON CONFLICT DO NOTHING;
+                """).format(
+                Identifier(table),
+                Identifier(other_id_col),
+            )
+            for row in df.itertuples():
+                cur.execute(query, (recipe_map[getattr(row, "temp_recipe_id")], other_map[getattr(row, other_col)]))
+
+
+def insert_recipe_ingredients(df: pd.DataFrame, recipe_map: dict, ingredient_map: dict) -> None:
+    df = _prepare_df(df)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for row in df.itertuples():
+                cur.execute(
+                    """
+                    INSERT INTO recipe_ingredients (
+                        recipe_id,
+                        ingredient_id,
+                        original_text,
+                        measure,
+                        quantity,
+                        weight_g
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING;
+                    """, (
+                    recipe_map[getattr(row, "temp_recipe_id")],
+                    ingredient_map[getattr(row, "ingredient_name")],
+                    getattr(row, "original_text"),
+                    getattr(row, "measure"),
+                    getattr(row, "quantity"),
+                    getattr(row, "weight_g"),
+                ))
+
+
+def insert_recipe_nutrients(df: pd.DataFrame, recipe_map: dict, nutrient_map: dict) -> None:
+    df = _prepare_df(df)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for row in df.itertuples():
+                cur.execute(
+                    """
+                    INSERT INTO recipe_nutrients (
+                        recipe_id,
+                        nutrient_id,
+                        quantity
+                    )
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT DO NOTHING;
+                    """, (
+                    recipe_map[getattr(row, "temp_recipe_id")],
+                    nutrient_map[getattr(row, "nutrient_tag")],
+                    getattr(row, "quantity"),
+                ))
 
 
 def insert_bundle(bundle: IngestionBundle) -> None:
     """Stores a dataset's IngestionBundle into the database."""
-    # Extracts desired frames
-    recipes = _extract_bundle_df(bundle, "recipes")
-    ingredients = _extract_bundle_df(bundle, "ingredients")
-    nutrients = _extract_bundle_df(bundle, "nutrients")
-    diets = _extract_bundle_df(bundle, "diets")
-    health_labels = _extract_bundle_df(bundle, "health_labels")
-    cautions = _extract_bundle_df(bundle, "cautions")
-    cuisines = _extract_bundle_df(bundle, "cuisines")
-    meal_types = _extract_bundle_df(bundle, "meal_types")
-    dish_types = _extract_bundle_df(bundle, "dish_types")
+    # Insertions
 
     # Maps temp processing IDs to PostgreSQL IDs
-    recipe_id_mapping = insert_recipes(recipes)
+    recipe_map = insert_recipes(bundle.tables["recipes"])
+
+    # Maps UNIQUE nutrient tags to PostgreSQL IDs
+    nutrient_map = insert_nutrients(bundle.tables["nutrients"])
+
+    # Maps UNIQUE names to PostgreSQL IDs
+    ingredient_map = insert_one_val_table(
+        bundle.tables["ingredients"],
+        "ingredients",
+        "ingredient_id",
+        "ingredient_name",
+    )
+    diet_map = insert_one_val_table(
+        bundle.tables["diets"],
+        "diets",
+        "diet_id",
+        "diet_name",
+    )
+    health_label_map = insert_one_val_table(
+        bundle.tables["health_labels"],
+        "health_labels",
+        "health_label_id",
+        "health_label_name",
+    )
+    caution_map = insert_one_val_table(
+        bundle.tables["cautions"],
+        "cautions",
+        "caution_id",
+        "caution_name",
+    )
+    cuisine_map = insert_one_val_table(
+        bundle.tables["cuisines"],
+        "cuisines",
+        "cuisine_id",
+        "cuisine_name",
+    )
+    meal_type_map = insert_one_val_table(
+        bundle.tables["meal_types"],
+        "meal_types",
+        "meal_type_id",
+        "meal_type_name",
+    )
+    dish_type_map = insert_one_val_table(
+        bundle.tables["dish_types"],
+        "dish_types",
+        "dish_type_id",
+        "dish_type_name",
+    )
+
+    # Junction insertions
+    insert_recipe_ingredients(bundle.tables["recipe_ingredients"], recipe_map, ingredient_map)
+    insert_recipe_nutrients(bundle.tables["recipe_nutrients"], recipe_map, nutrient_map)
+    insert_recipe_junction(
+        bundle.tables["recipe_diets"],
+        "recipe_diets",
+        "diet_id",
+        "diet_name",
+        recipe_map,
+        diet_map,
+    )
+    insert_recipe_junction(
+        bundle.tables["recipe_health_labels"],
+        "recipe_health_labels",
+        "health_label_id",
+        "health_label_name",
+        recipe_map,
+        health_label_map,
+    )
+    insert_recipe_junction(
+        bundle.tables["recipe_cautions"],
+        "recipe_cautions",
+        "caution_id",
+        "caution_name",
+        recipe_map,
+        caution_map,
+    )
+    insert_recipe_junction(
+        bundle.tables["recipe_cuisines"],
+        "recipe_cuisines",
+        "cuisine_id",
+        "cuisine_name",
+        recipe_map,
+        cuisine_map,
+    )
+    insert_recipe_junction(
+        bundle.tables["recipe_meal_types"],
+        "recipe_meal_types",
+        "meal_type_id",
+        "meal_type_name",
+        recipe_map,
+        meal_type_map,
+    )
+    insert_recipe_junction(
+        bundle.tables["recipe_dish_types"],
+        "recipe_dish_types",
+        "dish_type_id",
+        "dish_type_name",
+        recipe_map,
+        dish_type_map,
+    )
