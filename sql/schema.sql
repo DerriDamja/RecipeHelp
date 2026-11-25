@@ -1,5 +1,5 @@
 -- Preference Type --
-CREATE TYPE preference_enum AS ENUM ('LOVE', 'LIKE', 'EXCLUDE');
+CREATE TYPE preference_enum AS ENUM ('LIKE', 'EXCLUDE');
 
 
 
