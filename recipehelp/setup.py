@@ -9,7 +9,14 @@ This involves:
 from recipehelp import db, ingest
 
 
-def main() -> None:
+def setup_dump() -> None:
+    print("[SETUP] Setting up from dump...")
+    db.execute_sql_script("dump.sql")
+    print("[SETUP] Successfully initialized from dump.")
+
+
+def setup_ingest() -> None:
+    print("[SETUP] Setting up from recipe dataset...")
     db.execute_sql_script("schema.sql")
     print("[SETUP] Successfully initialized DB tables.")
     print("[SETUP] Fetching recipe database. This may take a second...")
@@ -22,6 +29,13 @@ def main() -> None:
     print("[SETUP] Successfully populated DB.")
     db.execute_sql_script("indexes.sql")
     print("[SETUP] Successfully added DB indexes.")
+
+
+def main(from_dump: bool = True) -> None:
+    if from_dump:
+        setup_dump()
+    else:
+        setup_ingest()
     print("[SETUP] Setup is complete.")
 
 
