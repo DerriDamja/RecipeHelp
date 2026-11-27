@@ -55,7 +55,7 @@ def add_user_diets(user_id: int, diet_ids: list[int]) -> None:
         db.insert_user_diet(user_id, diet_id)
 
 
-def add_user_health_label(user_id: int, label_ids: list[int]) -> None:
+def add_user_health_labels(user_id: int, label_ids: list[int]) -> None:
     for label_id in label_ids:
         db.insert_user_health_label(user_id, label_id)
 
