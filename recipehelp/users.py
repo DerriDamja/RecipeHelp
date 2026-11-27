@@ -1,5 +1,5 @@
 """Manages user logic, such as creation, modification, and deletion"""
-import re
+from re import match
 from enum import Enum
 from recipehelp import db, nutrition
 
@@ -19,7 +19,7 @@ def _make_preference(preference: str) -> UserPreference:
 def validate_user_email(email: str) -> None:
     """Ensures a user email is in a valid email format"""
     pattern = r"^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
-    if not bool(re.match(pattern, email)):
+    if not bool(match(pattern, email)):
         raise ValueError(f"{email} uses an invalid email format")
 
 
