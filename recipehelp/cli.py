@@ -26,7 +26,7 @@ recipe_app = typer.Typer(
     no_args_is_help=True,
 )
 user_app = typer.Typer(
-    name="recipehelp user",
+    name="user",
     help="CLI for managing users in RecipeHelp.",
     no_args_is_help=True,
 )
