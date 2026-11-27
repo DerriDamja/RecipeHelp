@@ -93,7 +93,6 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
         "source",
         "url",
         "image_url",
-        "calories",
         "servings",
         "total_weight_g",
     ]].copy()
@@ -105,7 +104,6 @@ def transform_dataset(df: pd.DataFrame) -> IngestionBundle:
         "recipe_name",
         "source_name",
         "source_url",
-        "calories",
         "total_weight_g",
     ])
 

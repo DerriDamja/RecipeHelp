@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS recipes (
     source_name TEXT NOT NULL,
     source_url TEXT UNIQUE NOT NULL,
     image_url TEXT,
-    calories NUMERIC(12,4) NOT NULL CHECK (calories > 0), 
     servings NUMERIC(8,2) NOT NULL CHECK (servings > 0),
     total_weight_g NUMERIC(12,4) NOT NULL CHECK (total_weight_g > 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
