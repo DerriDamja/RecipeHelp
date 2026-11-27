@@ -3,12 +3,13 @@
 import pandas as pd
 import psycopg
 import os
-from psycopg.sql import SQL, Identifier
 from dotenv import load_dotenv
+from psycopg.sql import SQL, Identifier
 from pathlib import Path
 from typing import LiteralString, cast
 from time import sleep
 from recipehelp.ingest import IngestionBundle
+from recipehelp.users import UserPreference
 
 load_dotenv()
 
@@ -370,3 +371,201 @@ def insert_bundle(bundle: IngestionBundle) -> None:
         recipe_map,
         dish_type_map,
     )
+
+
+def insert_user(email: str, display_name: str) -> int:
+    """Adds a new user to the database and returns their user ID"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO users (
+                    email,
+                    display_name
+                )
+                VALUES (%s, %s)
+                ON CONFLICT (email)
+                DO NOTHING
+                RETURNING user_id;
+                """, (
+                    email,
+                    display_name,
+                ))
+
+            res = cur.fetchone()
+            if res is None:
+                raise ValueError("An account with this email already exists")
+
+            return res[0]
+
+
+def insert_user_diet(user_id: int, diet_id: int) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+            """
+            INSERT INTO user_diets (
+                user_id,
+                diet_id
+            )
+            VALUES (%s, %s)
+            ON CONFLICT (user_id, diet_id)
+            DO NOTHING;
+            """, (
+                user_id,
+                diet_id,
+            ))
+
+
+def insert_user_health_label(user_id: int, health_label_id: int) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO  user_health_labels (
+                    user_id,
+                    health_label_id
+                )
+                VALUES (%s, %s)
+                ON CONFLICT (user_id, health_label_id)
+                DO NOTHING;
+                """, (
+                    user_id,
+                    health_label_id,
+                ))
+
+
+def insert_user_cuisine_pref(
+        user_id: int,
+        cuisine_id: int,
+        preference: UserPreference,
+    ) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO user_cuisine_preferences (
+                    user_id,
+                    cuisine_id,
+                    preference
+                )
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id, cuisine_id)
+                DO UPDATE SET
+                    preference = EXCLUDED.preference;
+                """, (
+                    user_id,
+                    cuisine_id,
+                    preference,
+                ))
+
+
+def insert_user_ingredient_pref(
+        user_id: int,
+        ingredient_id: int,
+        preference: UserPreference,
+    ) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO user_ingredient_preferences (
+                    user_id,
+                    ingredient_id,
+                    preference
+                )
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id, ingredient_id)
+                DO UPDATE SET
+                    preference = EXCLUDED.preference;
+                """, (
+                    user_id,
+                    ingredient_id,
+                    preference,
+                ))
+
+
+def insert_user_nutrition(
+        user_id: int,
+        nutrient_id: int,
+        min_quantity: float,
+        max_quantity: float,
+    ) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO user_nutrition_goals (
+                    user_id,
+                    nutrient_id,
+                    min_quantity,
+                    max_quantity
+                )
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (user_id, nutrient_id)
+                DO UPDATE SET
+                    min_quantity = EXCLUDED.min_quantity
+                    max_quantity = EXCLUDED.max_quantity;
+                """, (
+                    user_id,
+                    nutrient_id,
+                    min_quantity,
+                    max_quantity,
+                ))
+
+
+def update_user_name(user_id: int, new_name: str) -> None:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE users
+                SET display_name = %s
+                WHERE id = %s;
+                """, (
+                    new_name,
+                    user_id,
+                ))
+
+
+def id_exists(table: str, id_col: str, id: int) -> bool:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            query = SQL(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM {}
+                    WHERE {} = %s
+                );
+                """).format(
+                Identifier(table),
+                Identifier(id_col),
+            )
+            res = cur.execute(query, (id,)).fetchone()
+            if res is None:
+                raise KeyError(f"Error searching for the {id_col} ID in {table}")
+
+            return res[0]
+
+
+def get_id_by_name(table: str, id_col: str, name_col: str, name: str) -> int:
+    """Selects an ID from a table given a name. Intended for use where names are UNIQUE"""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            query = SQL(
+                """
+                SELECT {}
+                FROM {}
+                WHERE {} = %s;
+                """
+            ).format(
+                Identifier(id_col),
+                Identifier(table),
+                Identifier(name_col),
+            )
+            res = cur.execute(query, (name,)).fetchone()
+            if res is None:
+                raise KeyError(f"Error retrieving ID for {name} in {table}")
+
+            return res[0]
