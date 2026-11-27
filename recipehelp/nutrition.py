@@ -1,5 +1,28 @@
 """Handles nutrition logic"""
 from typing import Optional
+from recipehelp.db import id_exists
+
+
+def validate_goal_boundaries(
+        min_quantity: float,
+        max_quantity: float,
+    ) -> None:
+    if min_quantity is None and max_quantity is None:
+        raise ValueError("At least one boundary needs to be provided")
+
+    if min_quantity is not None and min_quantity < 0:
+        raise ValueError("The minimum bound cannot be negative")
+
+    if max_quantity is not None and max_quantity < 0:
+        raise ValueError("The maximum bound cannot be negative")
+
+    if (
+        min_quantity is not None
+        and max_quantity is not None
+        and min_quantity > max_quantity
+    ):
+        raise ValueError("The minimum bound cannot exceed the maximum bound")
+
 
 class NutritionGoal:
     def __init__(
@@ -15,7 +38,12 @@ class NutritionGoal:
 
     def _validate_id(self) -> None:
         """Ensures nutrient ID is present in the DB"""
-        
+        if not id_exists(
+            "nutrients",
+            "nutrient_id",
+            self.nutrient_id
+        ):
+            raise ValueError(f"Nutrient does not exist")
 
     def _validate_boundaries(self) -> None:
         """Ensures boundaries form a valid range"""
