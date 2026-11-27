@@ -1,6 +1,5 @@
 """Handles nutrition logic"""
 from typing import Optional
-from recipehelp.db import id_exists
 
 
 def validate_goal_boundaries(
@@ -36,14 +35,13 @@ class NutritionGoal:
         self.max_quantity = max_quantity
         self._validate_boundaries()
 
-    def _validate_id(self) -> None:
-        """Ensures nutrient ID is present in the DB"""
+    """def _validate_id(self) -> None:
         if not id_exists(
             "nutrients",
             "nutrient_id",
             self.nutrient_id
         ):
-            raise ValueError(f"Nutrient does not exist")
+            raise ValueError(f"Nutrient does not exist")"""
 
     def _validate_boundaries(self) -> None:
         """Ensures boundaries form a valid range"""
