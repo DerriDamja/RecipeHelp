@@ -569,3 +569,30 @@ def get_id_by_name(table: str, id_col: str, name_col: str, name: str) -> int:
                 raise KeyError(f"Error retrieving ID for {name} in {table}")
 
             return res[0]
+
+
+def get_property_map(
+        table: str,
+        id_col: str,
+        name_col: str
+    ) -> dict[str, int]:
+    """
+    Returns a map of UNIQUE property names and their associated ID.
+    Example properties: diets, health_labels, cuisines, etc.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            query = SQL(
+                """
+                SELECT {}, {}
+                FROM {}
+                ORDER BY {};
+                """
+            ).format(
+                Identifier(id_col),
+                Identifier(name_col),
+                Identifier(table),
+                Identifier(name_col),
+            )
+            cur.execute(query)
+            return {name: id for id, name in cur.fetchall()}
