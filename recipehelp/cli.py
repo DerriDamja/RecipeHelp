@@ -178,8 +178,8 @@ def add_user_nutrition_goal(email: str) -> None:
         typer.echo("That nutrient does not exist")
         return
 
-    min_quantity = typer.prompt("Enter a minimum quantity bound (leave empty if none)", type=float)
-    max_quantity = typer.prompt("Enter a maximum quantity bound (leave empty if none)", type=float)
+    min_quantity = typer.prompt("Enter a minimum quantity bound", type=float)
+    max_quantity = typer.prompt("Enter a maximum quantity bound", type=float)
 
     try:
         user_id = users.get_id_by_email(email)
