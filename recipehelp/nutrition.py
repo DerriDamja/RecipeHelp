@@ -35,14 +35,6 @@ class NutritionGoal:
         self.max_quantity = max_quantity
         self._validate_boundaries()
 
-    """def _validate_id(self) -> None:
-        if not id_exists(
-            "nutrients",
-            "nutrient_id",
-            self.nutrient_id
-        ):
-            raise ValueError(f"Nutrient does not exist")"""
-
     def _validate_boundaries(self) -> None:
         """Ensures boundaries form a valid range"""
         if self.min_quantity is None and self.max_quantity is None:
