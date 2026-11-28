@@ -42,8 +42,8 @@ def app_setup(from_dump: bool = True) -> None:
 @user_app.command("create")
 def add_user() -> None:
     typer.echo("-- Create a new user --\n")
-    email: str = typer.prompt("Email Address:")
-    display_name: str = typer.prompt("Display Name:")
+    email: str = typer.prompt("Email Address")
+    display_name: str = typer.prompt("Display Name")
 
     if not typer.confirm(
         f"Create user {display_name} ({email})?"
@@ -68,7 +68,7 @@ def add_user_diet(email: str) -> None:
     for diet in diets:
         typer.echo(diet)
 
-    add_list = _prompt_input_list("Diets to add (comma-separate):")
+    add_list = _prompt_input_list("Diets to add (comma-separate)")
     diet_ids = _make_id_add_list(diets, add_list)
 
     try:
@@ -90,7 +90,7 @@ def add_user_health_label(email: str) -> None:
     for label in health_labels:
         typer.echo(label)
 
-    add_list = _prompt_input_list("Health labels to add (comma-separate):")
+    add_list = _prompt_input_list("Health labels to add (comma-separate)")
     label_ids = _make_id_add_list(health_labels, add_list)
 
     try:
@@ -111,7 +111,7 @@ def add_user_cuisine_pref(email: str) -> None:
     typer.echo("\nCuisine Options:")
     for cuisine in cuisines:
         typer.echo(cuisine)
-    cuisine = typer.prompt("Pick a Cuisine:").lower()
+    cuisine = typer.prompt("Pick a Cuisine").lower()
     try:
         cuisine_id = cuisines[cuisine]
     except KeyError:
@@ -121,7 +121,7 @@ def add_user_cuisine_pref(email: str) -> None:
     typer.echo("Preference Options:")
     for pref in users.UserPreference:
         typer.echo(pref)
-    preference = typer.prompt("Pick a preference:").upper()
+    preference = typer.prompt("Pick a preference").upper()
 
     try:
         user_id = users.get_id_by_email(email)
@@ -141,7 +141,7 @@ def add_user_ingredient_pref(email: str) -> None:
     typer.echo("\nIngredient Options:")
     for ingredient in ingredients:
         typer.echo(ingredient)
-    ingredient = typer.prompt("Pick an Ingredient:").lower()
+    ingredient = typer.prompt("Pick an Ingredient").lower()
     try:
         ingredient_id = ingredients[ingredient]
     except KeyError:
@@ -151,7 +151,7 @@ def add_user_ingredient_pref(email: str) -> None:
     typer.echo("Preference Options:")
     for pref in users.UserPreference:
         typer.echo(pref)
-    preference = typer.prompt("Pick a preference:").upper()
+    preference = typer.prompt("Pick a preference").upper()
 
     try:
         user_id = users.get_id_by_email(email)
@@ -171,15 +171,15 @@ def add_user_nutrition_goal(email: str) -> None:
     typer.echo("Nutrient Options:")
     for nutrient in nutrients:
         typer.echo(nutrient)
-    nutrient = typer.prompt("Pick a Nutrient:").lower()
+    nutrient = typer.prompt("Pick a Nutrient")
     try:
         nutrient_id = nutrients[nutrient]
     except KeyError:
         typer.echo("That nutrient does not exist")
         return
 
-    min_quantity = typer.prompt("Enter a minimum quantity bound (leave empty if none):", type=float)
-    max_quantity = typer.prompt("Enter a maximum quantity bound (leave empty if none):", type=float)
+    min_quantity = typer.prompt("Enter a minimum quantity bound (leave empty if none)", type=float)
+    max_quantity = typer.prompt("Enter a maximum quantity bound (leave empty if none)", type=float)
 
     try:
         user_id = users.get_id_by_email(email)
