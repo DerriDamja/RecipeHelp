@@ -90,10 +90,9 @@ def insert_recipes(df: pd.DataFrame) -> dict[int, int]:
                         source_url,
                         image_url,
                         servings,
-                        calories,
                         total_weight_g
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT DO NOTHING
                     RETURNING recipe_id;
                     """, (
@@ -102,7 +101,6 @@ def insert_recipes(df: pd.DataFrame) -> dict[int, int]:
                     getattr(row, "source_url"),
                     getattr(row, "image_url"),
                     getattr(row, "servings"),
-                    getattr(row, "calories"),
                     getattr(row, "total_weight_g"),
                 ))
 
@@ -504,7 +502,7 @@ def insert_user_nutrition(
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (user_id, nutrient_id)
                 DO UPDATE SET
-                    min_quantity = EXCLUDED.min_quantity
+                    min_quantity = EXCLUDED.min_quantity,
                     max_quantity = EXCLUDED.max_quantity;
                 """, (
                     user_id,
